@@ -1,0 +1,530 @@
+------CREACION DE PROYECTO DE MAVEN
+
+* Buscar: Maven in five minute
+
+* Copiar: mvn archetype:generate -DgroupId=com.mycompany.app -DartifactId=("nombre de la app") -DarchetypeArtifactId=maven-archetype-quickstart -DarchetypeVersion=1.4 -DinteractiveMode=false
+
+* Ir a la carpeta madre y abrirla en CMD y crear la app con el comando anterior..
+
+
+
+-- CONFIGURACION DEL PROYECTO PADRE
+
+* Eliminados el SRC ya que no es necesaria, ya que no necesitamos ejecutar la carpeta madre
+
+* Eliminamos los comentarios y el tag de URL
+
+* Verificar que la version de java este en 17 y más
+
+* Eliminar las dependencias que esten instaladas
+
+Configurar la construcción del proyecto, dentro del build:
+ <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.springframework.boot</groupId> -- Configuración de app spring boot
+          <artifactId>spring-boot-maven-plugin</artifactId> -- Configuración de app maven
+          <version>3.1.5</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+* Agregarle la dependencia de LOMBOK a la carpeta madre para que todos los microservicios la tenga integrada
+
+* Agregamos el packaging: <packaging>pom</packaging> -- Esto le dice a maven que es una carpeta madre que NO se ejecutara
+(Nota: Maven trabaja con metodologia de herencias)
+
+* Agregamos el parent a la clase madre:
+ <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>3.1.5</version>
+    <relativePath/>
+  </parent> -- Esto indica que es hija de spring boot y ella va a heredar a sus hijos
+
+
+-- CREAMOS LOS PROYECTOS DE CADA HIJO
+(Nota: Por defecto los proyectos se crean como hijos de Spring boot)
+
+-- ORGANIZACION DE LOS MICROSERVICIOS
+
+* API GATEWAY
+
+Es una puerta de entrada, es quien se encarga de recibir la petición del usuario y lo redirecciona, ejemplo.
+El cliente quiere saber el listado de cursos, el hace la petición al Api Gateway, ese API GATEWAY tiene la configuración de redirigir hacia la petición del cliente, en este caso iria a los cursos.
+
+Si el mismo cliente quiere saber los estudiantes, tambien hace la petición al API GATEWAY y el lo redirecciona hacia el servicio de estudiantes.
+
+(Nota: Nunca se debe pedir peticiones directamente a los serivicios, deben pasar por el GATEWAY, es su puerta de entrada y la que recepciona las peticiones desde el exterior)
+
+* COURSES
+
+Este microservicio se encargara de gestionar los cursos. Esta puede comunicarse con estudiantes mediante un rest.
+
+* STUDENTS
+
+Este microservicio se encargara de gestionar los estudiantes. Esta puede comunicarse con cursos mediante un rest.
+
+* BASES DE DATOS
+
+Los microservicios estarán cada uno en conectados en DISTINTAS bases de datos. Por ejemplo podemos conectar una a PostgresSQL y otra a MYSQL.
+
+* EUREKA SERVER
+
+Es un servidor de registro, suponiendo que nuestro microservicio gateway esta desplegado en un servidor, El microservicioo curso esta desplegado en otra IP y el estudiantes esta en otra IP. Para configurar IPS suele ser mas complejo y engorroso..
+
+Para esto utilizamos Eureka, se encarga directamente de registrar todos los microservicios en un solo lugar, hace un listado y lo hace solamente con el nombre del microservicio. Este almanace la IP y el nombre del servidor.
+
+Todos los microservicios que se tenga se registran en Eureka y el los administra las IP desacopladas y comunicarlas entre los serivicios
+
+* CONFIG SERVER
+
+Teniendo un GATEWAY, Students y Courses. Todas las aplicaciones de spring boot traen una configuracion de application.properties o application.yml. Este config server toma la configuración de cada uno y se almacena en un solo microservicio.
+
+Este va a almacenar la configuración de cada uno de nuestros microservicios
+
+* CONFIGURACION DE LOS MICROSERVICIOS EN MODULOS
+
+Abrimos el pom.xml del PADRE tomamos el groupId, artifactId, version... (LAS QUE ESTAN FUERA DEL PARENT)
+ <groupId>com.mycompany.app</groupId>
+ <artifactId>SpringMicroservices</artifactId>
+ <version>1.0-SNAPSHOT</version>
+
+LUEGO abrimos el pom.xml DEL HIJO y pegamos esa copia dentro de la etiqueta PARENT, ESTO hará que se haga HIJO del proyecto general
+
+Luego en el pom.xml DEL PADRE creamos los modulos para vincular los hijos:
+<modules>
+    <module>microservice.gateway</module>
+    <module>microservice.eureka</module>
+    <module>microservice.config</module>
+    <module>microservice.student</module>
+    <module>microservice-course</module>
+</modules>
+
+
+* CREACION DE LOS MICROSERVICION, ORDEN Y DEPENDENCIAS
+
+ -- GATEWAY
+	maven, microservice-gateway
+	dependencias:
+	1.Gateway
+	2.Eureka Discovery Client
+	3.Config Client
+	4.Spring boot Actuator
+
+ -- EUREKA
+
+	maven, microservice-eureka
+	dependencias:
+	1.Eureka Server
+	2.Config Client
+	3.Spring boot Actuator
+
+	Configurar el servidor eureka:
+	(Nota: Cambiar el application.properties a application.yml)
+	
+		server:
+  			port: 8761           <-------------- Referencia de defaultZone
+
+		spring:
+  			application:
+   			  name: msvc-eureka
+  			config:
+   			  import: optional:configserver:http://localhost:8888  <--------------- Para configurar el config server
+
+		eureka:
+  			instance:
+    			  hostname: localhost
+  			client:
+    			  register-with-eureka: false -- Para que no se registre dentro de si mismo
+    			  fetch-registry: false
+    			  server-url:
+      			     defaultZone: http://localhost:${server.port}/eureka/--Aqui le pasamos el puerto como parametro de 										   server
+
+En la aplicación principal de Springboot activamos el Eureka para que pueda funcionar con la anotación: @EnableEurekaServer
+
+-- CONFIG SERVER
+
+	maven, microservice-config
+	1.Config Server
+	
+-- STUDENT
+
+	maven, microservice-student
+	dependencias:
+	1.Spring Web
+	2.Spring Data JPA
+	3.MySQL Driver
+	4.Config Client
+	5.Eureka Discovery Client
+	6.Spring Boot Actuator
+
+En la aplicación principal de Springboot activamos el Eureka para que pueda funcionar con la anotación: @EnableDiscoveryClient (Opcional)
+
+Configuramos la aplicacion student cambiando application.properties por application.yml
+
+		
+server:
+  port: 8090
+
+spring:
+  application:
+    name: mscv-studen
+
+
+ datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://mysqlDB:3306/studentsDb
+    username: test
+    password: 1234
+
+ jpa:
+    hibernate:
+      ddl-auto: create
+
+    database: mysql
+    database-platform: org.hibernate.dialect.MySQL8Dialect
+
+ config:
+    import: optional:configserver:http://localhost:8888
+    
+eureka:   <----------- Para que se registre en el servidor de eureka
+  instance:
+    hostname: localhost
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka   <----------- Indicandole el servidor de eureka
+
+-- COURSE
+
+	maven, microservice-course
+	dependencias:
+	1.Spring Web
+	2.Spring Data JPA
+	3.PostgresSQL Driver
+	4.Config Client
+	5.Eureka Discovery Client
+	6.Spring Boot Actuator
+
+En la aplicación principal de Springboot activamos el Eureka para que pueda funcionar con la anotación: @EnableDiscoveryClient (Opcional)
+
+Configuramos la aplicacion student cambiando application.properties por application.yml
+
+
+server:
+  port: 9090
+
+spring:
+  application:
+    name: mscv-course
+
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://postgredb:5432/courseDB
+    username: test
+    password: 1234
+
+  jpa:
+    hibernate:
+      ddl-auto: create
+
+    database: postgresql
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+
+  config:
+    import: optional:configserver:http://localhost:8888
+
+eureka: <----------- Para que se registre en el servidor de eureka
+  instance:
+    hostname: localhost
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka <----------- Indicandole el servidor de eureka
+
+
+-- CREACIÓN DE LAS PROPIEDADES DE LOS SERVICIOS
+
+ 1-> Student
+a)
+? models
+* Creación de la entidad student: @Data,@AllArgsConstructor,@NoArgsConstructor,@Entity,@Builder,@Table 
+(Long id,String name,String lastname,String email, Long courseId)
+
+? repository
+@Repository
+@Transactional
+* Creación del repositorio de student: StudentRepository extends CRUDRepository<Student,Long>
+* Creamos una query para consultar el estudiante por el id del curso
+ 	@Query("SELECT s FROM Student s WHERE s.courseId = :idCourse")
+   	 List<Student> findAllStudent(Long idCourse);
+//List<Student> findAllByCourseId(Long idCourse); <-- Opcional
+
+? services
+* Creamos una interface llamada IStudentService con sus metodos:
+    List<Student> findAll(); <-- Para traer todos los estudiantes
+
+    Student findById(Long id); <-- Para traer los estudiantes por ID
+
+    void save(Student student); <-- Para crear los estudiantes
+
+    List<Student> findByIdCourse(Long idCourse); <-- Para buscar estudiantes por ID de curso
+
+* Creamos una clase de implementacion de servives llamada IStudentServiceImpl que implementara la clase StudentService:
+Tambíen debemos inyectar el StudentRepository para asi traer los metodos 
+  
+@Service
+    @Autowired
+    private StudentRepository studentRepository;
+  
+
+
+
+    @Override
+    public List<Student> findAll() {
+        return (List<Student>) studentRepository.findAll();
+    }
+
+    @Override
+    public Student findById(Long id) {
+        return studentRepository.findById(id).orElseThrow();
+    }
+
+    @Override
+    public void save(Student student) {
+
+        studentRepository.save(student);
+    }
+
+    @Override
+    public List<Student> findByIdCourse(Long idCourse) {	
+        return studentRepository.findAllStudent(idCourse);   <------- Clase que se creo con la Query
+    }
+}
+
+
+
+? controller
+
+* Creamos la clase studentController y anotamos con @RestController y @RequestMapping("/api/student")
+
+* Creamos los metodos e inyectamos la implementación de IStudentService
+
+
+    @Autowired
+    private IStudentService studentService;  <-- Tengo una duda aquí pero el no usa el StudentServiceImp (me parece raro)
+
+    @PostMapping("/create")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void saveStudent(@RequestBody Student student){
+        studentService.save(student);
+    }
+
+
+    @GetMapping("/all")
+    public ResponseEntity<?> findAllStudents(){
+        return ResponseEntity.ok(studentService.findAll());
+    }
+
+    @GetMapping("/search/{id}")
+    public ResponseEntity<?> findById(@PathVariable Long id){
+        return ResponseEntity.ok(studentService.findById(id));
+    }
+
+    @GetMapping("/search-by-course/{idCourse}")			<----- METODO para consumir desde COURSE
+    public ResponseEntity<?> findByIdCourse(@PathVariable Long idCourse){
+        return ResponseEntity.ok(studentService.findByIdCourse(idCourse));
+    }
+
+ 2-> Course
+
+a)
+? models
+* Creación de la entidad course: @Data,@AllArgsConstructor,@NoArgsConstructor,@Entity,@Builder,@Table 
+(Long id,String name,String teacher)
+
+? repository
+
+@Repository
+@Transactional
+* Creación del repositorio de course: CourseRepository extends CRUDRepository<Course,Long>
+
+? services
+
+* Creamos una interface llamada ICourseService con sus metodos:
+ List<Course> findAll();
+
+    Course findById(Long id);
+
+    void save(Course course);
+
+    StudentByCourseResponse findStudentByIdCourse(Long idCourse);
+
+* Creamos una clase de implementacion de servives llamada CourseServiceImpl que implementara la clase ICourseService:
+Tambíen debemos inyectar el CourseRepository y StudentRepository para asi traer los metodos.
+	
+
+@Service
+
+    @Autowired
+    private ICourseRepository courseRepository;
+
+    @Autowired
+    private StudentClient studentClient;
+
+
+    @Override
+    public List<Course> findAll() {
+        return (List<Course>) courseRepository.findAll();
+    }
+
+    @Override
+    public Course findById(Long id) {
+        return courseRepository.findById(id).orElseThrow();
+    }
+
+    @Override
+    public void save(Course course) {
+        courseRepository.save(course);
+
+    }
+
+    @Override
+    public StudentByCourseResponse findStudentByIdCourse(Long idCourse) {
+        //Consultar el curso
+        Course course = courseRepository.findById(idCourse).orElse(new Course());
+
+        //Obtener los estudiantes
+
+        List<StudentDTO> studentDTOList = studentClient.findAllStudentByCourse(idCourse);
+        return StudentByCourseResponse.builder()
+                .courseName(course.getName())
+                .teacher(course.getTeacher())
+                .studentDTOList(studentDTOList)
+                .build();
+    }
+
+
+? controller
+
+* Creamos la clase studentController y anotamos con @RestController y @RequestMapping("/api/course")
+
+* Creamos los metodos e inyectamos la implementación de ICourseService
+
+
+    @Autowired
+    private ICourseService courseService; 
+
+    @PostMapping("/create")
+    @ResponseStatus(HttpStatus.CREATED)
+    public void saveCourse(@RequestBody Course course){
+        courseService.save(course);
+    }
+
+    @GetMapping("/all")
+    public ResponseEntity<?> getAll(){
+        return ResponseEntity.ok(courseService.findAll());
+    }
+
+    @GetMapping("/search/{id}")
+    public ResponseEntity<?> findById(@PathVariable Long id){
+        return ResponseEntity.ok(courseService.findById(id));
+    }
+
+    @GetMapping("/search-student/{idCourse}")
+    public ResponseEntity<?> findStudentsByIdCourse(@PathVariable Long idCourse){
+        return ResponseEntity.ok(courseService.findStudentByIdCourse(idCourse));
+    }
+
+-- VINCULACIÓN DE LOS MICROSERVICIOS CURSOS Y STUDENTS, UTILIZANDO Feing
+* Desde el microservicio curso enviaremos la información para que el microservicio estudiantes nos devuelva la información, los estudiantes a dicho curso.
+
+* Nos ubicamos en nuestro microservicio de estudiantes y entramos en el controller, en el controllerStudent habilitaremos un endpoint que será consumido desde el microservicio de cursos
+
+@GetMapping("/search-by-course/{idCourse}")			<----- METODO para consumir desde COURSE
+    public ResponseEntity<?> findByIdCourse(@PathVariable Long idCourse){   <---- Mandamos el ID del curso
+        return ResponseEntity.ok(studentService.findByIdCourse(idCourse)); 
+    }
+
+* BUSCAMOS la dependencia de Feing llamada OPenFeing y la agregamos en el pom.xlm del microservice COURSE
+
+* Vamos a la aplicación principal y agregamos la ANOTACION @EnableFeignClients para poder habilitar FEING en nuestro microservice
+
+* Creamos un nuevo package que se llamará "client" y dentro una interface que se llame StudentClient ESTO EN EL MICROSERVICE COURSE
+
+Dentro de esta vamos a configurar la interface con la anotación @FeignClient(name = "mscv-studen" ,url = "localhost:8090/api/student") <--- 
+a) name= LE PASAMOS EL NOMBRE DEL MICROSERVICIO CON EL QUE SE VA A COMUNICAR, ESTE NOMBRE ESTA CONFIGURADO EN EL APPLICATION.YML, el nombre que le asignamos a la aplicación del microservicio STUDENT.
+
+b) url= LE PASAMOS LA URL A LA QUE VA A CONSULTAR, ES DECIR LA URL RELACIONADA AL CONTROLLER DE STUDENT, EN ESTE CASO SERIA: LOCALHOST:8090/api/student
+
+Luego creamos el metodo que va a consumir la URL: 
+
+@GetMapping("/search-by-course/{idCourse}")
+    List<StudentDTO> findAllStudentByCourse(@PathVariable Long idCourse);  <--- EL FEIGN NO PUEDE RECIBIR ENTITY ENTONCES CREAMOS PARA ESO UN DTO (DATA TRANSFER OBJECT) 
+
+* Por lo anterior mencionado, vamos a crear un package DTO y vamos a crear el DTO de Student, el cual le pasaremos los datos del Student exceptuando el ID
+
+@Data
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+    private String name;
+    private String lastName;
+    private String email;
+    private Long courseId;
+
+c) Creamos el metodo o la forma en que se ejecutará este llamado anterior realizado con el Feing
+
+* Creamos un nuevo package llamado http donde vamos a manejar las respuestas, los request
+	- Dentro de esta creamos dos carpetas, una llamada response y otra llamada request
+	- Dentro de la carpeta response creamos una nueva clase llamada StudentByCourseResponse, esta clase va a mapear la clase a la persona que consulta, los parametros que tendrá esta clase serán: 
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
+public class StudentByCourseResponse {
+
+    private String courseName;
+    private String teacher;
+    private List<StudentDTO> studentDTOList;
+
+}
+	- Esta será la respuesta que recibira la petición, Nombre del curso, Profesor y la lista de estudiantes
+
+
+* Nos vamos a nuestra capa de servicios del microservicio COURSE y dentro de ICourseService creamos el metodo que va a llamar a nuestro microservicio de estudiantes que será lo que acabamos de crear en el http/response que es el StudentByCourseResponse:
+
+	StudentByCourseResponse findStudentByIdCourse(Long idCourse); <-- Creamos la consulta de tipo StudentByCourseResponse para que retorne esos valores, luego el nombre del metodo y el ID del curso.
+
+* Una vez hecho lo anterior pasamos a CourseServiceImpl exportanto la nueva clase generada y agregamos el nuevo metodo creando estos parametros: 
+ public StudentByCourseResponse findStudentByIdCourse(Long idCourse) {
+
+	@Autowired
+    private StudentClient studentClient; <--- INYECTAMOS LA INTERFACE QUE CREAMOS PARA HACER LA CONEXION CON STUDENTS
+
+
+        //Consultar el curso
+        Course course = courseRepository.findById(idCourse).orElse(new Course());
+
+        //Obtener los estudiantes
+
+        List<StudentDTO> studentDTOList = studentClient.findAllStudentByCourse(idCourse); <---- AQUI ES DONDE CONSULTAMOS EL MICROSERVICIO DE ESTUDIANTES, MEDIANTE LA CLASE QUE CREAMOS CON EL FEIGN, OSEA EL CLIENT QUE CREAMOS
+        return StudentByCourseResponse.builder()  <---- Entonces retornamos el StudentByCourse con sus datos buildeados
+                .courseName(course.getName())
+                .teacher(course.getTeacher())
+                .studentDTOList(studentDTOList)
+                .build();    
+    }
+
+* Luego pasamos al controller y creamos el ENDPOINT que haga la petición anteriormente realizada: 
+
+	@GetMapping("/search-student/{idCourse}")
+    public ResponseEntity<?> findStudentsByIdCourse(@PathVariable Long idCourse){
+        return ResponseEntity.ok(courseService.findStudentByIdCourse(idCourse));
+    }
+
+-- CREAMOS LA BASE DE DATOS Y LOS DATOS CORRESPONDIENTES (DE SER REQUERIDO)
+
+-- HACEMOS LAS PRUEBAS CON POSTMAN PARA VERIFICAR QUE TODO FUNCIONE CORRECTAMENTE, UNA VEZ VERIFICADO PODEMOS DAR POR TERMINADO EL MCV :D
+
+
