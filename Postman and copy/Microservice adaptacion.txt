@@ -525,6 +525,218 @@ public class StudentByCourseResponse {
 
 -- CREAMOS LA BASE DE DATOS Y LOS DATOS CORRESPONDIENTES (DE SER REQUERIDO)
 
--- HACEMOS LAS PRUEBAS CON POSTMAN PARA VERIFICAR QUE TODO FUNCIONE CORRECTAMENTE, UNA VEZ VERIFICADO PODEMOS DAR POR TERMINADO EL MCV :D
+-- HACEMOS LAS PRUEBAS CON POSTMAN PARA VERIFICAR QUE TODO FUNCIONE CORRECTAMENTE, UNA VEZ VERIFICADO PODEMOS DAR POR TERMINADO EL MSV :D
+
+-- AHORA PASAMOS A CONFIGURAR EL GATEWAY
+
+* Cambiamos el application.propperties a application.yml para configurarlo
+
+* Empezamos a configurar poniendo lo siguiente
+
+    server:
+      port: 8080    <--- Acá le estamos indicando la ruta en donde se levantará
+
+    spring:
+    //Agregamos la configuración del servidor como en todos los microservicios
+      config:
+          import: optional:configserver:http://localhost:8888
+      application:
+        name: msvc-gateway  <--- Asignamos el nombre del microservicio
+
+      cloud:
+        gateway:
+          discovery:
+            locator:
+              enable: true  <--- Aquí le decimos que el gateway está activo y que se mantendra pendiente para redireccionar a los usuarios a los diferentes servicios
+    //Aquí vamos a configurar las rutas a donde se va a conectar
+          routes:  <-- Variable para crear las rutas donde se conectará
+            - id: student  <-- Identificador de la ruta que vamos a consumir
+              uri: http://localhost:8090  <-- Dirección de la ruta que vamos a consumir
+              predicates: <-- Esta variable sirve para acceder a los endpoints
+                - Path=/api/student/** <-- Esta sería la variable general en MappingRequest, y los asteriscos indican que podrá acceder a cualquier ruta que este vinculado a ese enpoint, Ej: api/student/create
+            - id: courses <-- Identificado de la segunda ruta a consumir
+              uri: http://localhost:9090 <-- Dirección de la segunda ruta a crear
+              predicates: <-- Variable para acceder a los endpoints
+                - Path=/api/course/** <-- Variable para acceder a los endpoints como se indicó anteriormente
+
+----- NOTA: FIjarse bien en los niveles de cada cosa
+ Server y Spring van iguales
+ Port, Config, Application y Cloud van iguales
+ Import, Name y Gateway van iguales
+ Discovery y routes van iguales
+ Locator y el guión (-) van iguales
+ Enable, Id, Uri y Predicates van iguales
+
+ -- LUEGO PROBAMOS EN POSTMAN QUE FUNCIONE, SI EL FEIGN DA ERROR Revisamos y cambiamos la ruta a 8080
+
+ -- Por ultimo pasamos a configurar el MSCV Config Server para almacenar la configuración general de todos los microservicios
+
+* Cambiamos el application.propperties por application.yml
+
+* Creamos la variables de configuración
+
+server:
+  port: 8888
+
+spring:
+  profiles:
+    active: native <-- Acá configuramos el perfil, en este caso utilizamos el nativo pero se pueden tener distintos perfiles como para producción, desarrollo, pruebas, etc
+  application:
+    name: config-server
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: classpath:/configurations <-- Ruta donde va a encontrar la configuracion de todos nuestros microservicios
+  //Copiamos el nombre de la configuración:(configurations) y en resources creamos un nuevo directorio con este nombre = configurations
+
+* Una vez creada la carpeta configurations vamos a registrar todos los microservicios en ella para configura su configuración
+
+-- CREAMOS un archivo para la configuración del primer MSCV(STUDENT)-> msvc-student.yml
+    - Buscamos todos los archivos de configuración que tenemos en el application.yml del MSCV de student y lo pegamos en el mscv-student que creamos
+        La unica diferencia entre ellos es que vamos eliminar el atributo config y valor:
+
+        config:
+            import: optional:configserver:http://localhost:8888
+
+-- LUEGO vamos al application.yml del microservicio student y eliminamos algunas cosas de su configuración:
+    - Eliminamos el server y el puerto, dentro de spring eliminamos datasource y jpa y por ultimo el servidor eureka
+    - Atributos a eliminar:
+
+   server:
+       port: 8090
+
+      datasource:
+        driver-class-name: com.mysql.cj.jdbc.Driver
+        url: jdbc:mysql://localhost:3306/studentsdb
+        username: root
+        password: root
+
+      jpa:
+        hibernate:
+          ddl-auto: update
+        database: mysql
+        database-platform: org.hibernate.dialect.MySQL8Dialect
+
+      eureka:
+        instance:
+          hostname: localhost
+        client:
+          service-url:
+            defaultZone: http://localhost:8761/eureka
 
 
+      - Atributos que quedarán:
+
+      spring:
+        application:
+          name: mscv-student   <-- Nombre que identificará en el config (tiene que ser iguales)
+        config:
+          import: optional:configserver:http://localhost:8888 <-- Indica de donde importará los atributos eliminados
+
+-- CREAMOS un archivo para la configuración del segundo MSCV(COURSE)-> msvc-course.yml
+    - Buscamos todos los archivos de configuración que tenemos en el application.yml del MSCV de course y lo pegamos en el mscv-course que creamos
+        La unica diferencia entre ellos es que vamos eliminar el atributo config y valor.
+
+-- LUEGO vamos al application.yml del microservicio course y eliminamos algunas cosas de su configuración:
+    - Eliminamos el server y el puerto, dentro de spring eliminamos datasource y jpa y por ultimo el servidor eureka
+    - Atributos a eliminar:
+
+    server:
+      port: 9090
+
+        datasource:
+          driver-class-name: com.mysql.cj.jdbc.Driver
+          url: jdbc:mysql://localhost:3306/coursesdb
+          username: root
+          password: root
+
+        jpa:
+          hibernate:
+            ddl-auto: create
+
+          database: mysql
+          database-platform: org.hibernate.dialect.MySQL8Dialect
+
+          eureka:
+            instance:
+              hostname: localhost
+            client:
+              service-url:
+                defaultZone: http://localhost:8761/eureka
+
+        - Atributos que quedarán:
+
+        spring:
+          application:
+            name: mscv-course
+          config:
+            import: optional:configserver:http://localhost:8888
+
+-- CREAMOS un archivo para la configuración del tercer MSCV(GATEWAY)-> msvc-gateway.yml
+    - Buscamos todos los archivos de configuración que tenemos en el application.yml del MSCV de gateway y lo pegamos en el mscv-gateway que creamos
+        La unica diferencia entre ellos es que vamos eliminar el atributo config y valor.
+
+-- LUEGO vamos al application.yml del microservicio gateway y eliminamos algunas cosas de su configuración:
+    - Eliminamos el server y el puerto,
+    - Atributos a eliminar:
+         server:
+           port: 8080
+  cloud:
+    gateway:
+      discovery:
+        locator:
+          enable: true
+
+      routes:
+        - id: students
+          uri: http://localhost:8090
+          predicates:
+            - Path=/api/student/**
+        - id: courses
+          uri: http://localhost:9090
+          predicates:
+            - Path=/api/course/**
+
+
+      - ATRIBUTOS QUE QUEDAN EN EL YML DE GATEWAY
+
+      spring:
+        config:
+          import: optional:configserver:http://localhost:8888
+        application:
+          name: msvc-gateway
+
+
+-- CREAMOS un archivo para la configuración por ultimo MSCV(EUREKA)-> msvc-eureka.yml
+    - Buscamos todos los archivos de configuración que tenemos en el application.yml del MSCV de eureka y lo pegamos en el mscv-eureka que creamos
+        La unica diferencia entre ellos es que vamos eliminar el atributo config y valor.
+
+
+-- LUEGO vamos al application.yml del microservicio eureka y eliminamos algunas cosas de su configuración:
+    - Eliminamos el server y el puerto
+    - Atributos a eliminar:
+
+    server:
+      port: 8761
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    register-with-eureka: false
+    fetch-registry: false
+    server-url:
+      defaultZone: http://localhost:${server.port}/eureka/
+
+  - ATRIBUTOS QUE QUEDARÁN EN YML DE EUREKA
+
+    spring:
+      application:
+        name: msvc-eureka
+      config:
+        import: optional:configserver:http://localhost:8888
+
+
+-- UNA VEZ CONFIGURADOS TODOS LOS MICROSERVICIOS VAMOS A LA APLICACIÓN PRINCIPAL DEL CONFIG SERVER Y AGREGAMOS LA ANOTACIÓN:
+@EnableConfigServer
+PARA PODER HABILITAR LA CONEXION DE LOS MICROSERVICIOS

@@ -9,13 +9,17 @@
         <outputRelativeToContentRoot value="true" />
         <module name="microservice.eureka" />
         <module name="microservice.config" />
+        <module name="microservice.course" />
         <module name="microservice.student" />
-        <module name="microservice-course" />
         <module name="microservice.gateway" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
+      <module name="microservice-config" target="17" />
+      <module name="microservice-course" target="17" />
       <module name="microservice.studen" target="17" />
+      <module name="microservice.student (1)" target="17" />
+      <module name="microservice.student (2)" target="17" />
       <module name="SpringMicroservices (1)" target="1.5" />
       <module name="SpringMicroservices (2)" target="17" />
     </bytecodeTargetLevel>
@@ -24,12 +28,16 @@
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="SpringMicroservices" options="" />
       <module name="SpringMicroservices (2)" options="-parameters" />
+      <module name="microservice-config" options="-parameters" />
       <module name="microservice-course" options="-parameters" />
       <module name="microservice.config" options="-parameters" />
+      <module name="microservice.course" options="-parameters" />
       <module name="microservice.eureka" options="-parameters" />
       <module name="microservice.gateway" options="-parameters" />
       <module name="microservice.studen" options="-parameters" />
       <module name="microservice.student" options="-parameters" />
+      <module name="microservice.student (1)" options="-parameters" />
+      <module name="microservice.student (2)" options="-parameters" />
     </option>
   </component>
 </project>

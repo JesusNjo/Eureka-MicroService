@@ -1,7 +1,5 @@
 spring:
   application:
-    name: msvc-eureka
+    name: mscv-course
   config:
     import: optional:configserver:http://localhost:8888
-    server:
-      url: http://localhost:8888
